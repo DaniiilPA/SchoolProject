@@ -1,7 +1,7 @@
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy import BigInteger, Integer, String, DateTime, JSON, Boolean
+from sqlalchemy import BigInteger, Integer, String, DateTime, JSON, Boolean, Float
 from datetime import datetime
 
 # Настройки подключения
@@ -24,7 +24,7 @@ class User(Base):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
     
     # Интервал проверки (в часах)
-    check_interval: Mapped[int] = mapped_column(Integer, default=24)
+    check_interval: Mapped[float] = mapped_column(Float, default=24.0)
     
     # Часовой пояс (храним просто строку, например "Europe/Moscow" или смещение "+3")
     timezone: Mapped[str] = mapped_column(String, default="UTC")
@@ -56,3 +56,17 @@ async def init_db():
 async def get_db():
     async with async_session() as session:
         yield session
+        
+from sqlalchemy import update
+
+async def reset_statuses_on_startup():
+    """Сбрасывает все тревоги в 0 при запуске сервера"""
+    async with async_session() as session:
+        try:
+            # Устанавливаем alert_status = 0 для всех
+            stmt = update(User).values(alert_status=0)
+            await session.execute(stmt)
+            await session.commit()
+            print("♻️ Все статусы тревоги сброшены в 0 (чистый запуск)")
+        except Exception as e:
+            print(f"❌ Ошибка при сбросе статусов: {e}")

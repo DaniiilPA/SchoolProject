@@ -1,8 +1,8 @@
 import os
 import httpx
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from sqlalchemy import select, update
+from sqlalchemy import select
 from dotenv import load_dotenv
 from .database import async_session, User
 
@@ -21,42 +21,58 @@ async def send_telegram_alert(chat_id: int, text: str):
         try:
             await client.post(url, json=payload)
         except Exception as e:
-            print(f"❌ Ошибка отправки сообщения: {e}")
+            print(f"❌ Ошибка отправки: {e}")
+
+def is_now_in_dnd(start_str, end_str):
+    if not start_str or not end_str:
+        return False
+    now_time = datetime.now().strftime("%H:%M")
+    if start_str <= end_str:
+        return start_str <= now_time <= end_str
+    else:
+        return now_time >= start_str or now_time <= end_str
 
 async def check_users_job():
-    print(f"⏰ Проверка [{datetime.now().strftime('%H:%M:%S')}]")
+    now = datetime.utcnow()
+    print(f"⏰ --- СЕССИЯ ПРОВЕРКИ {now.strftime('%H:%M:%S')} ---")
     
     async with async_session() as db:
         result = await db.execute(select(User).where(User.is_active == True))
         users = result.scalars().all()
 
+        if not users:
+            print("ℹ️ В базе нет активных пользователей.")
+
         for user in users:
-            now = datetime.now(timezone.utc).replace(tzinfo=None)
+            # 1. Проверка сна
+            if is_now_in_dnd(user.dnd_start, user.dnd_end):
+                print(f"💤 Юзер {user.telegram_id} спит ({user.dnd_start}-{user.dnd_end}). Пропускаю.")
+                continue
+
+            # 2. Расчет времени
             time_passed = now - user.last_checkin
+            seconds_passed = time_passed.total_seconds()
+            threshold = user.check_interval * 3600
 
-            # 1. Если время вышло, а мы еще не кипишуем (alert_status == 0)
-            if time_passed > timedelta(seconds=30) and user.alert_status == 0:
-                print(f"⚠️ ПРЕДУПРЕЖДЕНИЕ для {user.telegram_id}")
-                await send_telegram_alert(user.telegram_id, "⏳ Ты давно не отмечался! У тебя есть 1 минута, прежде чем я подниму тревогу.")
-                # Ставим статус "Ждем ответа"
+            print(f"👤 Юзер {user.telegram_id}: прошло {seconds_passed:.0f}с / порог {threshold:.0f}с | статус: {user.alert_status}")
+
+            # 3. Логика
+            if seconds_passed > threshold and user.alert_status == 0:
+                print(f"⚠️ ТРИГГЕР: Шлю предупреждение юзеру {user.telegram_id}")
+                await send_telegram_alert(user.telegram_id, f"⏳ Время вышло! Ты в порядке?")
                 user.alert_status = 1
+                user.last_checkin = datetime.utcnow()
                 await db.commit()
 
-            # 2. Если мы уже ждем ответа больше 1 минуты (alert_status == 1)
-            elif user.alert_status == 1 and time_passed > timedelta(seconds=90): # 30 сек + 60 сек ожидания
-                print(f"🚨🚨🚨 SOS!!! Юзер {user.telegram_id} не отвечает!")
-                
-                # ИМИТАЦИЯ РАССЫЛКИ
-                print(f"📢 [СЛУЖБА SOS] Рассылаю сообщения контактам юзера {user.telegram_id}...")
-                print(f"📢 [СЛУЖБА SOS] Сообщение: 'Внимание! Юзер не выходил на связь более 24 часов. Последние координаты: неизвестны.'")
-                
-                user.alert_status = 2 # Статус "Тревога отправлена"
+            elif seconds_passed > 60 and user.alert_status == 1: # Даем 60 сек на ответ
+                print(f"🚨 ТРИГГЕР: SOS для {user.telegram_id}")
+                user.alert_status = 2
                 await db.commit()
-                
-                await send_telegram_alert(user.telegram_id, "🆘 ТРЕВОГА ОТПРАВЛЕНА КОНТАКТАМ!")
+                await send_telegram_alert(user.telegram_id, "🆘 ТРЕВОГА ОТПРАВЛЕНА!")
 
 async def start_scheduler():
     if not scheduler.get_jobs():
         scheduler.add_job(check_users_job, "interval", seconds=10)
     if not scheduler.running:
         scheduler.start()
+        print("⏰ Планировщик запущен.")
