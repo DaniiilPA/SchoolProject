@@ -155,7 +155,17 @@ async def save_dnd(message: types.Message, state: FSMContext):
 async def manual_sos(message: types.Message):
     async with httpx.AsyncClient() as client:
         await client.post(f"{SERVER_URL}/sos_manual", json={"telegram_id": message.from_user.id})
-    await message.answer("🚨 SOS АКТИВИРОВАН!")
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ ОТБОЙ (Я в порядке)", callback_data="i_am_ok")]
+    ])
+    
+    await message.answer(
+        "🚨 **ТРЕВОГА АКТИВИРОВАНА!**\nВаша записка и координаты готовы к отправке.\n\n"
+        "Чтобы возобновить мониторинг, нажмите кнопку ниже:",
+        reply_markup=kb,
+        parse_mode="Markdown"
+    )
 
 @router.message(F.text == "⏱ Интервал")
 async def set_interval(message: types.Message, state: FSMContext):

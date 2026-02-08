@@ -68,21 +68,20 @@ async def register_user(user_data: UserRegister, db: AsyncSession = Depends(get_
 
 @app.post("/checkin")
 async def checkin_user(user_data: UserRegister, db: AsyncSession = Depends(get_db)):
-    print(f"📥 Получен чекин от {user_data.telegram_id}")
-    
     query = select(User).where(User.telegram_id == user_data.telegram_id)
     result = await db.execute(query)
     user = result.scalar_one_or_none()
 
     if user:
-        user.last_checkin = datetime.utcnow()
-        user.alert_status = 0
-        
         if user.alert_status == 2:
-            print(f"📢 [SOS] ОТБОЙ для {user.telegram_id}")
+            print(f"🔔 [ОТБОЙ] Юзер {user.telegram_id} сбросил статус SOS в ручном режиме.")
 
+        # ПРИНУДИТЕЛЬНО обновляем всё:
+        user.last_checkin = datetime.utcnow()
+        user.alert_status = 0                 
+        
         await db.commit()
-        print(f"✅ Статус для {user.telegram_id} сброшен в БД.")
+        print(f"✅ Мониторинг для {user.telegram_id} возобновлен. Статус: 0, Таймер: 0с.")
         return {"status": "ok"}
     
     raise HTTPException(status_code=404, detail="User not found")
@@ -136,3 +135,4 @@ async def manual_sos_trigger(user_data: UserRegister, db: AsyncSession = Depends
     await db.commit()
     print(f"🚨 РУЧНОЙ SOS для {user_data.telegram_id}")
     return {"status": "sos_activated"}
+
