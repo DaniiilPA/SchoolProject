@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:15
@@ -13,3 +11,29 @@ services:
       - "5432:5432"
     volumes:
       - ./data/postgres_data:/var/lib/postgresql/data
+
+  server:
+    build:
+      context: .
+      dockerfile: server/Dockerfile
+    container_name: lonely_server
+    restart: always
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://user:password@db/lonely_db
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+
+  bot:
+    build:
+      context: .
+      dockerfile: bot/Dockerfile
+    container_name: lonely_bot
+    restart: always
+    env_file: .env
+    environment:
+      SERVER_URL: http://server:8000
+    depends_on:
+      - server

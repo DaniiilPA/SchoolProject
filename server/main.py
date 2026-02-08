@@ -6,8 +6,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 # Импортируем наши настройки из database.py
-from .database import init_db, get_db, User, reset_statuses_on_startup
-from .scheduler import start_scheduler, scheduler
+from database import init_db, get_db, User, reset_statuses_on_startup
+from scheduler import start_scheduler, scheduler
 
 # Жизненный цикл (Запуск/Остановка)
 @asynccontextmanager

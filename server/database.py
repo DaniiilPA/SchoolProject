@@ -5,7 +5,7 @@ from sqlalchemy import BigInteger, Integer, String, DateTime, JSON, Boolean, Flo
 from datetime import datetime
 
 # Настройки подключения
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@localhost/lonely_db")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:password@db/lonely_db")
 
 engine = create_async_engine(DATABASE_URL, 
                              echo=False,

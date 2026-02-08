@@ -8,7 +8,7 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from datetime import datetime
 
 router = Router()
-SERVER_URL = "http://127.0.0.1:8000"
+SERVER_URL = os.getenv("SERVER_URL", "http://server:8000")
 MENU_BUTTONS = ["📝 Записка", "👥 Контакты", "⏱ Интервал", "💤 Режим сна", "📊 Статус", "🆘 SOS"]
 
 class Form(StatesGroup):

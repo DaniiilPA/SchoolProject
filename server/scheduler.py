@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select
 from dotenv import load_dotenv
-from .database import async_session, User
+from    database import async_session, User
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
